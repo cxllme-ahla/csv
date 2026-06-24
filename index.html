@@ -1,77 +1,633 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="light">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OceanData App</title>
+    
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
-<title>Data Viewer</title>
+    <style>
+        :root {
+            --md-primary: #3fa3d1;
+            --md-on-primary: #ffffff;
+            --md-primary-container: #c5e3f0;
+            --md-on-primary-container: #001f2a;
+            --md-secondary-container: #e0e3e8;
+            --md-surface: #fdfcff;
+            --md-surface-variant: #eceff3;
+            --md-surface-container: #f3f5f8;
+            --md-on-surface: #1a1c1e;
+            --md-on-surface-variant: #40484c;
+            --md-outline: #70787d;
+            --md-outline-variant: #c0c8cc;
+            --md-elevation-1: 0 1px 3px 1px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.3);
+            --md-elevation-2: 0 2px 6px 2px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.3);
+            --md-elevation-3: 0 4px 8px 3px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.3);
+            --app-bar-height: 64px;
+            --nav-width: 80px;
+            --footer-height: 56px;
+        }
 
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+        .dark {
+            --md-primary: #76bedd;
+            --md-on-primary: #003544;
+            --md-primary-container: #004d61;
+            --md-on-primary-container: #c5e3f0;
+            --md-secondary-container: #3a3f43;
+            --md-surface: #1a1c1e;
+            --md-surface-variant: #2a2d30;
+            --md-surface-container: #202326;
+            --md-on-surface: #e2e2e5;
+            --md-on-surface-variant: #c0c8cc;
+            --md-outline: #8a9297;
+            --md-outline-variant: #40484c;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: var(--md-surface);
+            color: var(--md-on-surface);
+            margin: 0;
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
 
-<link href="style.css" rel="stylesheet">
+        /* ========== APP LAYOUT ========== */
+        .app-layout {
+            display: grid;
+            grid-template-rows: var(--app-bar-height) 1fr var(--footer-height);
+            grid-template-columns: var(--nav-width) 1fr;
+            grid-template-areas:
+                "appbar appbar"
+                "nav    main"
+                "footer footer";
+            min-height: 100vh;
+        }
+
+        @media (max-width: 768px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: var(--app-bar-height) 1fr var(--footer-height);
+                grid-template-areas:
+                    "appbar"
+                    "main"
+                    "footer";
+            }
+        }
+
+        /* ========== TOP APP BAR ========== */
+        .app-bar {
+            grid-area: appbar;
+            background: var(--md-surface);
+            border-bottom: 1px solid var(--md-outline-variant);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 16px;
+        }
+
+        .app-bar-title {
+            font-size: 22px;
+            font-weight: 500;            letter-spacing: 0;
+            flex-grow: 1;
+        }
+
+        /* ========== NAVIGATION RAIL (Desktop) ========== */
+        .nav-rail {
+            grid-area: nav;
+            background: var(--md-surface);
+            border-right: 1px solid var(--md-outline-variant);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 8px;
+            position: sticky;
+            top: var(--app-bar-height);
+            height: calc(100vh - var(--app-bar-height));
+        }
+
+        @media (max-width: 768px) {
+            .nav-rail { display: none; }
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 4px 0;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--md-on-surface-variant);
+            position: relative;
+            transition: color 0.2s;
+        }
+
+        .nav-item:hover { color: var(--md-on-surface); }
+
+        .nav-icon-container {
+            width: 56px;
+            height: 32px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .nav-item.active .nav-icon-container {            background: var(--md-primary-container);
+            color: var(--md-on-primary-container);
+        }
+
+        .nav-item.active { color: var(--md-on-surface); }
+
+        .nav-label {
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-item.active .nav-label { font-weight: 700; }
+
+        /* ========== BOTTOM NAV (Mobile) ========== */
+        .bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--md-surface-container);
+            border-top: 1px solid var(--md-outline-variant);
+            z-index: 100;
+            padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+        }
+
+        @media (max-width: 768px) {
+            .bottom-nav { display: flex; justify-content: space-around; }
+            .app-layout {
+                grid-template-rows: var(--app-bar-height) 1fr calc(var(--footer-height) + 72px);
+            }
+        }
+
+        .bottom-nav .nav-item {
+            flex: 1;
+            max-width: 120px;
+        }
+
+        /* ========== MAIN CONTENT ========== */
+        .main-content {
+            grid-area: main;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .main-content { padding: 16px; }        }
+
+        /* ========== FOOTER ========== */
+        .app-footer {
+            grid-area: footer;
+            background: var(--md-surface-container);
+            border-top: 1px solid var(--md-outline-variant);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            font-size: 13px;
+            color: var(--md-on-surface-variant);
+        }
+
+        @media (max-width: 768px) {
+            .app-footer {
+                position: fixed;
+                bottom: 72px;
+                left: 0;
+                right: 0;
+                z-index: 99;
+                padding: 0 16px;
+            }
+        }
+
+        /* ========== COMPONENTS ========== */
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--md-on-surface-variant);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .icon-btn:hover { background: var(--md-surface-variant); }
+
+        .md-card {
+            background: var(--md-surface-container-low, var(--md-surface-variant));
+            border-radius: 16px;
+            overflow: hidden;
+            transition: box-shadow 0.2s, transform 0.2s;
+            display: flex;
+            flex-direction: column;            border: 1px solid var(--md-outline-variant);
+        }
+
+        .md-card:hover {
+            box-shadow: var(--md-elevation-2);
+            transform: translateY(-2px);
+        }
+
+        .md-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: var(--md-secondary-container);
+            color: var(--md-on-surface);
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .md-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 100px;
+            border: none;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .md-btn-filled {
+            background: var(--md-primary);
+            color: var(--md-on-primary);
+        }
+
+        .md-btn-filled:hover { box-shadow: var(--md-elevation-1); }
+
+        .md-btn-tonal {
+            background: var(--md-secondary-container);
+            color: var(--md-on-surface);
+        }
+
+        .progress-ring {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--md-outline-variant);            border-top-color: var(--md-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 500;
+            margin: 0 0 4px 0;
+            color: var(--md-on-surface);
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--md-on-surface-variant);
+            margin: 0;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .nav-item.active .material-symbols-rounded {
+            font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--md-outline-variant); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--md-outline); }
+    </style>
 </head>
-
 <body>
 
-<nav class="topbar">
+<div class="app-layout">
 
-<div class="logo">
-📊 Data Viewer
+    <!-- ========== TOP APP BAR ========== -->    <header class="app-bar">
+        <button class="icon-btn md:hidden" id="menu-btn">
+            <span class="material-symbols-rounded">menu</span>
+        </button>
+        <span class="material-symbols-rounded" style="color: var(--md-primary); font-size: 28px;">waves</span>
+        <h1 class="app-bar-title">OceanData</h1>
+        <button class="icon-btn" id="search-btn" title="Cari">
+            <span class="material-symbols-rounded">search</span>
+        </button>
+        <button class="icon-btn" id="theme-toggle" title="Tema">
+            <span class="material-symbols-rounded" id="theme-icon">dark_mode</span>
+        </button>
+        <button class="icon-btn" title="Profil">
+            <span class="material-symbols-rounded">account_circle</span>
+        </button>
+    </header>
+
+    <!-- ========== NAVIGATION RAIL (Desktop) ========== -->
+    <aside class="nav-rail">
+        <a href="#home" class="nav-item active" data-page="home">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">home</span>
+            </div>
+            <span class="nav-label">Beranda</span>
+        </a>
+        <a href="#data" class="nav-item" data-page="data">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">dataset</span>
+            </div>
+            <span class="nav-label">Data</span>
+        </a>
+        <a href="#stats" class="nav-item" data-page="stats">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">monitoring</span>
+            </div>
+            <span class="nav-label">Statistik</span>
+        </a>
+        <a href="#settings" class="nav-item" data-page="settings">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">settings</span>
+            </div>
+            <span class="nav-label">Pengaturan</span>
+        </a>
+    </aside>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="main-content">
+        
+        <div class="page-header">
+            <h2 class="page-title">Beranda</h2>            <p class="page-subtitle">Menampilkan 6 file Excel terbaru dari repository</p>
+        </div>
+
+        <!-- Stats Row -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;">
+            <div class="md-chip">
+                <span class="material-symbols-rounded" style="font-size: 18px; color: var(--md-primary);">table_chart</span>
+                <span id="total-files">0 File</span>
+            </div>
+            <div class="md-chip">
+                <span class="material-symbols-rounded" style="font-size: 18px; color: var(--md-primary);">schedule</span>
+                <span>Auto Update</span>
+            </div>
+            <div class="md-chip">
+                <span class="material-symbols-rounded" style="font-size: 18px; color: var(--md-primary);">cloud_done</span>
+                <span>GitHub Pages</span>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" style="display: flex; flex-direction: column; align-items: center; padding: 60px 0; gap: 16px;">
+            <div class="progress-ring"></div>
+            <p style="color: var(--md-on-surface-variant);">Memuat data...</p>
+        </div>
+
+        <!-- Error -->
+        <div id="error-msg" style="display: none; text-align: center; padding: 40px;">
+            <span class="material-symbols-rounded" style="font-size: 56px; color: #d93025;">error</span>
+            <h3 style="margin: 12px 0 8px;">Gagal Memuat</h3>
+            <p id="error-text" style="color: var(--md-on-surface-variant); margin-bottom: 16px;"></p>
+            <button class="md-btn md-btn-filled" onclick="location.reload()">
+                <span class="material-symbols-rounded" style="font-size: 18px;">refresh</span>
+                Coba Lagi
+            </button>
+        </div>
+
+        <!-- Cards -->
+        <div id="card-container" class="card-grid" style="display: none;"></div>
+
+        <!-- Empty -->
+        <div id="empty-state" style="display: none; text-align: center; padding: 60px 20px;">
+            <span class="material-symbols-rounded" style="font-size: 72px; color: var(--md-outline);">inbox</span>
+            <h3 style="margin: 16px 0 8px;">Belum Ada Data</h3>
+            <p style="color: var(--md-on-surface-variant);">Upload file Excel ke folder /data</p>
+        </div>
+
+    </main>
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="app-footer">        <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--md-primary);">waves</span>
+            <span>OceanData App</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <span class="hidden sm:inline">v1.0.0</span>
+            <span>&copy; 2026</span>
+        </div>
+    </footer>
+
+    <!-- ========== BOTTOM NAV (Mobile) ========== -->
+    <nav class="bottom-nav">
+        <a href="#home" class="nav-item active" data-page="home">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">home</span>
+            </div>
+            <span class="nav-label">Beranda</span>
+        </a>
+        <a href="#data" class="nav-item" data-page="data">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">dataset</span>
+            </div>
+            <span class="nav-label">Data</span>
+        </a>
+        <a href="#stats" class="nav-item" data-page="stats">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">monitoring</span>
+            </div>
+            <span class="nav-label">Statistik</span>
+        </a>
+        <a href="#settings" class="nav-item" data-page="settings">
+            <div class="nav-icon-container">
+                <span class="material-symbols-rounded">settings</span>
+            </div>
+            <span class="nav-label">Pengaturan</span>
+        </a>
+    </nav>
+
 </div>
 
-<div class="menu">
+<script>
+    // ========== THEME TOGGLE ==========
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    
+    if (savedTheme === 'dark') {
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+        themeIcon.textContent = 'light_mode';    }
 
-<a href="#history">History</a>
+    themeToggle.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        document.documentElement.classList.toggle('light', !isDark);
+        themeIcon.textContent = isDark ? 'light_mode' : 'dark_mode';
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
 
-<a href="#info">Info</a>
+    // ========== NAVIGATION ==========
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            const page = item.dataset.page;
+            document.querySelectorAll(`[data-page="${page}"]`).forEach(i => i.classList.add('active'));
+        });
+    });
 
-<button id="themeBtn">
-🌙
-</button>
+    // ========== LOAD EXCEL DATA ==========
+    const DATA_FOLDER = 'data';
+    
+    async function init() {
+        try {
+            const pathParts = window.location.pathname.split('/').filter(Boolean);
+            const owner = pathParts[0] || 'ahlawisnu';
+            const repo = pathParts[1] || 'csv';
+            
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${DATA_FOLDER}`;
+            const response = await fetch(apiUrl);
+            
+            if (!response.ok) throw new Error('Repository tidak dapat diakses. Pastikan publik.');
+            
+            const files = await response.json();
+            const excelFiles = files.filter(f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'));
 
-</div>
+            if (excelFiles.length === 0) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'block';
+                return;
+            }
 
-</nav>
+            excelFiles.sort((a, b) => b.name.localeCompare(a.name));
+            const latestFiles = excelFiles.slice(0, 6);
+            
+            document.getElementById('total-files').textContent = `${excelFiles.length} File`;
 
-<main>
+            const container = document.getElementById('card-container');
+            container.innerHTML = '';
 
-<section id="info" class="card">
+            for (const file of latestFiles) {                try {
+                    const res = await fetch(file.download_url);
+                    const buffer = await res.arrayBuffer();
+                    const wb = XLSX.read(buffer, { type: 'array' });
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
 
-<h2>Informasi</h2>
+                    if (data.length > 0) {
+                        const row = data[0];
+                        const keys = Object.keys(row);
+                        
+                        const titleKey = keys.find(k => /judul|title|nama/i.test(k)) || keys[0];
+                        const descKey = keys.find(k => /deskripsi|desc|isi/i.test(k)) || keys[1];
+                        const dateKey = keys.find(k => /tanggal|date/i.test(k));
+                        const linkKey = keys.find(k => /link|url/i.test(k));
 
-<pre id="txtContent">
-Loading...
-</pre>
+                        container.insertAdjacentHTML('beforeend', createCard({
+                            title: row[titleKey] || 'Tanpa Judul',
+                            desc: row[descKey] || 'Tidak ada deskripsi',
+                            date: dateKey ? formatDate(row[dateKey]) : '',
+                            link: linkKey ? row[linkKey] : null,
+                            filename: file.name
+                        }));
+                    }
+                } catch (err) {
+                    console.error(`Error: ${file.name}`, err);
+                }
+            }
 
-</section>
+            document.getElementById('loading').style.display = 'none';
+            container.style.display = 'grid';
 
-<section id="history" class="card">
+        } catch (error) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error-msg').style.display = 'block';
+            document.getElementById('error-text').textContent = error.message;
+        }
+    }
 
-<h2>Riwayat Update</h2>
+    function createCard({ title, desc, date, link, filename }) {
+        const hasLink = link && link !== '#';
+        return `
+            <article class="md-card">
+                <div style="padding: 20px; flex-grow: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div class="md-chip">
+                            <span class="material-symbols-rounded" style="font-size: 16px;">table_chart</span>
+                            Excel
+                        </div>
+                        ${date ? `<span style="font-size: 12px; color: var(--md-on-surface-variant);">${date}</span>` : ''}
+                    </div>                    <h3 style="font-size: 18px; font-weight: 500; margin: 0 0 8px; line-height: 1.4;">
+                        ${escapeHtml(title)}
+                    </h3>
+                    <p style="font-size: 14px; color: var(--md-on-surface-variant); margin: 0 0 12px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                        ${escapeHtml(desc)}
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--md-on-surface-variant);">
+                        <span class="material-symbols-rounded" style="font-size: 16px;">description</span>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename)}</span>
+                    </div>
+                </div>
+                <div style="padding: 12px 20px; border-top: 1px solid var(--md-outline-variant); display: flex; justify-content: flex-end;">
+                    ${hasLink ? `
+                        <a href="${link}" target="_blank" class="md-btn md-btn-filled" style="padding: 8px 16px; font-size: 13px; text-decoration: none;">
+                            <span class="material-symbols-rounded" style="font-size: 18px;">open_in_new</span>
+                            Buka
+                        </a>
+                    ` : `
+                        <button class="md-btn md-btn-tonal" style="padding: 8px 16px; font-size: 13px;">
+                            <span class="material-symbols-rounded" style="font-size: 18px;">visibility</span>
+                            Lihat
+                        </button>
+                    `}
+                </div>
+            </article>
+        `;
+    }
 
-<div id="historyContainer">
+    function formatDate(d) {
+        try {
+            return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        } catch { return String(d); }
+    }
 
-</div>
+    function escapeHtml(t) {
+        const div = document.createElement('div');
+        div.textContent = t;
+        return div.innerHTML;
+    }
 
-<div id="pagination">
-
-</div>
-
-</section>
-
-</main>
-
-<footer>
-
-Copyright © 2026
-
-Data Viewer
-
-Powered by GitHub Pages
-
-</footer>
-
-<script src="script.js"></script>
+    document.addEventListener('DOMContentLoaded', init);
+</script>
 
 </body>
 </html>
